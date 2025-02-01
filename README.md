@@ -8,6 +8,8 @@ A decentralized infrastructure for IoT devices built on the Stacks blockchain. T
 - Data validation and verification
 - Real-time data aggregation and analytics
 - Configurable triggers and automated responses
+- Device group management and monitoring
+- Group-wide alert system
 
 ## Contract Functions
 ### Core Functions
@@ -28,6 +30,18 @@ A decentralized infrastructure for IoT devices built on the Stacks blockchain. T
 - Define automated responses
 - Monitor trigger status
 
+### Device Groups
+- Create and manage device groups
+- Add/remove devices from groups
+- Set group-wide alert thresholds
+- Monitor group performance
+
+### Alert System
+- Create group-wide alerts
+- Configure alert severity levels
+- Track alert history
+- Manage alert resolution
+
 ## Usage Examples
 ### Setting up Data Aggregation
 Data aggregation is automatically handled when storing device data. Access aggregated statistics using the `get-aggregation` function:
@@ -35,13 +49,21 @@ Data aggregation is automatically handled when storing device data. Access aggre
 (get-aggregation device-id data-type)
 ```
 
-### Creating Triggers
-Set up automated responses using the trigger system:
+### Creating Device Groups
+Create logical groups of devices for easier management:
 ```clarity
-(create-trigger device-id trigger-id data-type condition threshold action)
+(create-device-group group-id description alert-threshold)
+```
+
+### Managing Group Alerts
+Set up and manage alerts for device groups:
+```clarity
+(create-group-alert group-id alert-id alert-type severity message)
 ```
 
 ## Security Considerations
 - All operations require proper authentication
 - Trigger actions are validated before execution
 - Data aggregation maintains data integrity
+- Group management restricted to authorized users
+- Alert system with graduated severity levels
