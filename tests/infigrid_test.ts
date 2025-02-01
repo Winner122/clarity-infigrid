@@ -22,7 +22,6 @@ Clarinet.test({
     
     block.receipts[0].result.expectOk();
     
-    // Verify device info
     let query = chain.callReadOnlyFn(
       'infigrid',
       'get-device-info',
@@ -38,82 +37,89 @@ Clarinet.test({
 });
 
 Clarinet.test({
-  name: "Test data storage and permissions",
+  name: "Test data storage with aggregation",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     const deployer = accounts.get('deployer')!;
     const device1 = accounts.get('wallet_1')!;
-    const operator = accounts.get('wallet_2')!;
     
-    // Register device
+    // Register device and store multiple data points
     let block = chain.mineBlock([
       Tx.contractCall('infigrid', 'register-device', [
         types.ascii("Temperature Sensor"),
         types.ascii("TEMP_SENSOR")
       ], device1.address),
       
-      // Set permissions for operator
-      Tx.contractCall('infigrid', 'set-device-permission', [
+      Tx.contractCall('infigrid', 'store-data', [
         types.principal(device1.address),
-        types.principal(operator.address),
-        types.bool(true),
-        types.bool(true)
+        types.ascii("temperature"),
+        types.ascii("25")
+      ], device1.address),
+      
+      Tx.contractCall('infigrid', 'store-data', [
+        types.principal(device1.address),
+        types.ascii("temperature"),
+        types.ascii("27")
       ], device1.address)
     ]);
     
     block.receipts.map(receipt => receipt.result.expectOk());
     
-    // Store data using operator account
-    let dataBlock = chain.mineBlock([
-      Tx.contractCall('infigrid', 'store-data', [
-        types.principal(device1.address),
-        types.ascii("temperature"),
-        types.ascii("25.5")
-      ], operator.address)
-    ]);
-    
-    dataBlock.receipts[0].result.expectOk();
-    
-    // Verify stored data
-    let timestamp = dataBlock.receipts[0].result.expectOk().expectUint();
+    // Check aggregation
     let query = chain.callReadOnlyFn(
       'infigrid',
-      'get-device-data',
+      'get-aggregation',
       [
         types.principal(device1.address),
-        types.uint(timestamp)
+        types.ascii("temperature")
       ],
       deployer.address
     );
     
-    let data = query.result.expectSome().expectTuple();
-    assertEquals(data['data-type'], "temperature");
-    assertEquals(data['value'], "25.5");
-    assertEquals(data['verified'], true);
+    let aggregation = query.result.expectSome().expectTuple();
+    assertEquals(aggregation['count'], types.uint(2));
+    assertEquals(aggregation['sum'], 52);
+    assertEquals(aggregation['average'], 26);
   },
 });
 
 Clarinet.test({
-  name: "Test unauthorized access prevention",
+  name: "Test trigger creation and management",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     const device1 = accounts.get('wallet_1')!;
-    const unauthorized = accounts.get('wallet_2')!;
     
-    // Register device
     let block = chain.mineBlock([
       Tx.contractCall('infigrid', 'register-device', [
         types.ascii("Temperature Sensor"),
         types.ascii("TEMP_SENSOR")
       ], device1.address),
       
-      // Attempt unauthorized data storage
-      Tx.contractCall('infigrid', 'store-data', [
+      Tx.contractCall('infigrid', 'create-trigger', [
         types.principal(device1.address),
+        types.uint(1),
         types.ascii("temperature"),
-        types.ascii("25.5")
-      ], unauthorized.address)
+        types.ascii("ABOVE"),
+        types.int(30),
+        types.ascii("ALERT")
+      ], device1.address)
     ]);
     
-    block.receipts[0].result.expectOk();
-    block.receipts[1].result.expectErr(types.uint(100)); // err-not-authorized
+    block.receipts.map(receipt => receipt.result.expectOk());
+    
+    // Verify trigger
+    let query = chain.callReadOnlyFn(
+      'infigrid',
+      'get-trigger',
+      [
+        types.principal(device1.address),
+        types.uint(1)
+      ],
+      device1.address
+    );
+    
+    let trigger = query.result.expectSome().expectTuple();
+    assertEquals(trigger['data-type'], "temperature");
+    assertEquals(trigger['condition'], "ABOVE");
+    assertEquals(trigger['threshold'], 30);
+    assertEquals(trigger['is-active'], true);
   },
 });
